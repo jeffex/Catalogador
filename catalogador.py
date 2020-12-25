@@ -2,19 +2,38 @@ from iqoptionapi.stable_api import IQ_Option
 from datetime import datetime, timedelta
 from colorama import init, Fore, Back
 from time import time
-import sys
+import sys, os
+from getpass import getpass
 
 init(autoreset=True)
+arquivo = 'sinais.txt'
 
-API = IQ_Option('', '')
-API.connect()
 
-if API.check_connect():
-	print(' Conectado com sucesso!')
-else:
-	print(' Erro ao conectar')
-	input('\n\n Aperte enter para sair')
-	sys.exit()
+def Conexao():
+	global API
+	print('=========================================\n|   INSIRA E-MAIL E SENHA DA IQOPTION   |\n=========================================')
+	email = str(input('E-mail: '))
+	senha = getpass()
+	Clear_Screen()
+	print('Conectando....')
+	API = IQ_Option(email, senha)
+	API.connect()
+
+	if API.check_connect():
+		Clear_Screen()
+		print(' Conectado com sucesso!')
+	else:
+		print(' Erro ao conectar')
+		input('\n\n Aperte enter para sair')
+		sys.exit()
+
+
+def Clear_Screen():
+	sistema = os.name
+	if sistema == 'nt':
+		os.system('cls')
+	else:
+		os.system('clear')
 
 
 def cataloga(par, dias, prct_call, prct_put, timeframe):
@@ -56,6 +75,8 @@ def cataloga(par, dias, prct_call, prct_put, timeframe):
 
 	return analise
 
+
+Conexao()
 
 print('\n\nQual timeframe deseja analisar?: ', end='')
 timeframe = int(input())
@@ -138,4 +159,4 @@ for par in catalogacao:
 						msg += ' | MG ' + str(i + 1) + ' - N/A - N/A'
 
 			print(msg)
-			open('sinais.txt', 'a').write('M' + str(timeframe) + ';' + par + ';' + horario + ';' + catalogacao[par][horario]['dir'].strip() + '\n')
+			open(arquivo, 'a').write('M' + str(timeframe) + ';' + par + ';' + horario + ';' + catalogacao[par][horario]['dir'].strip() + '\n')
