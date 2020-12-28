@@ -33,8 +33,8 @@ def Configuracoes():
 	config['email'] = arquivo.get('CONTA', 'email')
 	config['senha'] = arquivo.get('CONTA', 'senha')
 	timeframe_str = arquivo.get('CONFIGURACOES', 'timeframe')
-	# Transforma a string timeframe em uma lista com os timeframes
-	config['timeframe'] = list(timeframe_str.split(','))
+	# Transforma a string timeframe em uma lista de inteiros com os timeframes
+	config['timeframe'] = list(map(int, timeframe_str.split(',')))
 	config['dias'] = arquivo.get('CONFIGURACOES', 'dias')
 	config['porcentagem'] = arquivo.get('CONFIGURACOES', 'porcentagem')
 	config['martingale'] = arquivo.get('CONFIGURACOES', 'martingale')
@@ -56,7 +56,6 @@ def cataloga(par, dias, prct_call, prct_put, timeframe):
 	while sair == False:
 		velas = API.get_candles(par, (timeframe * 60), 1000, time_)
 		velas.reverse()
-
 		for x in velas:
 			if datetime.fromtimestamp(x['from']).strftime('%Y-%m-%d') not in datas_testadas:
 				datas_testadas.append(datetime.fromtimestamp(x['from']).strftime('%Y-%m-%d'))
@@ -90,24 +89,23 @@ def cataloga(par, dias, prct_call, prct_put, timeframe):
 
 print('=========================================\n|         CATALOGADOR DE SINAIS         |\n=========================================')
 
-Configuracoes()
-Conexao()
 
-timeframe_config = config['timeframe']
-
-dias = int(config['dias'])
-
-porcentagem = int(config['porcentagem'])
-
-martingale = config['martingale']
-
-prct_call = abs(porcentagem)
-prct_put = abs(100 - porcentagem)
-
-P = API.get_all_open_time()
-
-print('\n\n')
 try:
+	Configuracoes()
+	Conexao()
+
+	timeframe_config = config['timeframe']
+
+	dias = int(config['dias'])
+
+	porcentagem = int(config['porcentagem'])
+
+	martingale = config['martingale']
+
+	prct_call = abs(porcentagem)
+	prct_put = abs(100 - porcentagem)
+
+	P = API.get_all_open_time()
 	for timeframe in timeframe_config:
 		catalogacao = {}
 		for par in P['digital']:
