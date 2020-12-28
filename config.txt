@@ -1,0 +1,10 @@
+[CONTA]
+email = seu email
+senha = sua senha
+
+[CONFIGURACOES]
+timeframe = 5
+# Se mais de um timeframe separar por virgula. ex: 1,5,15
+dias = 15
+porcentagem = 85 
+martingale = 1
