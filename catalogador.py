@@ -40,6 +40,7 @@ def Configuracoes():
 	config['martingale'] = arquivo.get('CONFIGURACOES', 'martingale')
 	config['todos_pares'] = arquivo.get('CONFIGURACOES', 'todos_pares')
 	config['arquivo_saida'] = arquivo.get('CONFIGURACOES', 'arquivo_saida')
+	config['check_lista'] = arquivo.get('CONFIGURACOES', 'check_lista')
 
 
 def Clear_Screen():
@@ -116,18 +117,15 @@ try:
 	Conexao()
 
 	arquivo_saida = config['arquivo_saida']
-
+	check_lista = config['check_lista']
 	timeframe_config = config['timeframe']
-
 	dias = int(config['dias'])
-
 	porcentagem = int(config['porcentagem'])
-
 	martingale = config['martingale']
-
 	prct_call = abs(porcentagem)
 	prct_put = abs(100 - porcentagem)
 	paridades = Obter_Paridades()
+	data = datetime.now().strftime('%Y-%m-%d')
 	print(f'{Fore.GREEN}>>>>>CATALOGANDO {len(paridades)} PARIDADES EM {len(timeframe_config)} TIMEFRAME(S)<<<<<')
 	for timeframe in timeframe_config:
 		catalogacao = {}
@@ -192,6 +190,9 @@ try:
 								msg += ' | MG ' + str(i + 1) + ' - N/A - N/A'
 
 					print(msg)
-					open(arquivo_saida, 'a').write('M' + str(timeframe) + ';' + par + ';' + horario + ';' + catalogacao[par][horario]['dir'].strip() + '\n')
+					direcao = catalogacao[par][horario]['dir'].strip()
+					open(arquivo_saida, 'a').write('M' + str(timeframe) + ';' + par + ';' + horario + ';' + direcao + '\n')
+					if check_lista == 'S':
+						open(str(arquivo_saida) + '-CHECK', 'a').write(f'{data} {str(horario) + ":00"} {par} {direcao} {str(martingale) + "GL"} {str(timeframe) + "TM"}\n')
 except KeyboardInterrupt:
 	sys.exit()
