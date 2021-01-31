@@ -3,9 +3,9 @@ from datetime import datetime, timedelta
 from colorama import init, Fore, Back
 from time import time
 import sys, os, configparser
+import numpy as np
 
 init(autoreset=True)
-arquivo = 'lista.csv'
 
 
 def Conexao():
@@ -38,6 +38,8 @@ def Configuracoes():
 	config['dias'] = arquivo.get('CONFIGURACOES', 'dias')
 	config['porcentagem'] = arquivo.get('CONFIGURACOES', 'porcentagem')
 	config['martingale'] = arquivo.get('CONFIGURACOES', 'martingale')
+	config['todos_pares'] = arquivo.get('CONFIGURACOES', 'todos_pares')
+	config['arquivo_saida'] = arquivo.get('CONFIGURACOES', 'arquivo_saida')
 
 
 def Clear_Screen():
@@ -87,12 +89,33 @@ def cataloga(par, dias, prct_call, prct_put, timeframe):
 	return analise
 
 
+def Obter_Paridades():
+	P = API.get_all_open_time()
+	paridades = []
+	if config['todos_pares'] == 'S':
+		for pares in P['digital']:
+			paridades.append(pares)
+		for pares in P['turbo']:
+			paridades.append(pares)
+	else:
+		for pares in P['digital']:
+			if P['digital'][pares]['open'] == True:
+				paridades.append(pares)
+		for pares in P['turbo']:
+			if P['turbo'][pares]['open'] == True:
+				paridades.append(pares)
+
+	return np.unique(paridades)
+
+
 print('=========================================\n|         CATALOGADOR DE SINAIS         |\n=========================================')
 
 
 try:
 	Configuracoes()
 	Conexao()
+
+	arquivo_saida = config['arquivo_saida']
 
 	timeframe_config = config['timeframe']
 
@@ -104,43 +127,44 @@ try:
 
 	prct_call = abs(porcentagem)
 	prct_put = abs(100 - porcentagem)
-
-	P = API.get_all_open_time()
+	paridades = Obter_Paridades()
+	print(f'{Fore.GREEN}>>>>>CATALOGANDO {len(paridades)} PARIDADES EM {len(timeframe_config)} TIMEFRAME(S)<<<<<')
 	for timeframe in timeframe_config:
 		catalogacao = {}
-		for par in P['digital']:
-			if P['digital'][par]['open'] == True:
-				timer = int(time())
-				print(f'{Fore.GREEN}CATALOGANDO - {Fore.RESET} {Fore.BLUE}{par}{Fore.RESET} | TIMEFRAME {Fore.GREEN}M{timeframe}{Fore.RESET}...', end='')
-				catalogacao.update({par: cataloga(par, dias, prct_call, prct_put, timeframe)})
+		contador = 1
+		for par in paridades:
+			timer = int(time())
+			print(f'{contador} - {Fore.GREEN}CATALOGANDO - {Fore.RESET} {Fore.BLUE}{par}{Fore.RESET} | TIMEFRAME {Fore.GREEN}M{timeframe}{Fore.RESET}...', end='')
+			catalogacao.update({par: cataloga(par, dias, prct_call, prct_put, timeframe)})
 
-				for par in catalogacao:
-					for horario in sorted(catalogacao[par]):
-						if martingale.strip() != '':
+			for par in catalogacao:
+				for horario in sorted(catalogacao[par]):
+					if martingale.strip() != '':
 
-							mg_time = horario
-							soma = {'verde': catalogacao[par][horario]['verde'], 'vermelha': catalogacao[par][horario]['vermelha'], 'doji': catalogacao[par][horario]['doji']}
+						mg_time = horario
+						soma = {'verde': catalogacao[par][horario]['verde'], 'vermelha': catalogacao[par][horario]['vermelha'], 'doji': catalogacao[par][horario]['doji']}
 
-							for i in range(int(martingale)):
+						for i in range(int(martingale)):
 
-								catalogacao[par][horario].update({'mg' + str(i + 1): {'verde': 0, 'vermelha': 0, 'doji': 0, '%': 0}})
+							catalogacao[par][horario].update({'mg' + str(i + 1): {'verde': 0, 'vermelha': 0, 'doji': 0, '%': 0}})
 
-								mg_time = str(datetime.strptime((datetime.now()).strftime('%Y-%m-%d ') + str(mg_time), '%Y-%m-%d %H:%M') + timedelta(minutes=timeframe))[11:-3]
+							mg_time = str(datetime.strptime((datetime.now()).strftime('%Y-%m-%d ') + str(mg_time), '%Y-%m-%d %H:%M') + timedelta(minutes=timeframe))[11:-3]
 
-								if mg_time in catalogacao[par]:
-									catalogacao[par][horario]['mg' + str(i + 1)]['verde'] += catalogacao[par][mg_time]['verde'] + soma['verde']
-									catalogacao[par][horario]['mg' + str(i + 1)]['vermelha'] += catalogacao[par][mg_time]['vermelha'] + soma['vermelha']
-									catalogacao[par][horario]['mg' + str(i + 1)]['doji'] += catalogacao[par][mg_time]['doji'] + soma['doji']
+							if mg_time in catalogacao[par]:
+								catalogacao[par][horario]['mg' + str(i + 1)]['verde'] += catalogacao[par][mg_time]['verde'] + soma['verde']
+								catalogacao[par][horario]['mg' + str(i + 1)]['vermelha'] += catalogacao[par][mg_time]['vermelha'] + soma['vermelha']
+								catalogacao[par][horario]['mg' + str(i + 1)]['doji'] += catalogacao[par][mg_time]['doji'] + soma['doji']
 
-									catalogacao[par][horario]['mg' + str(i + 1)]['%'] = round(100 * (catalogacao[par][horario]['mg' + str(i + 1)]['verde' if catalogacao[par][horario]['dir'] == 'CALL' else 'vermelha'] / (catalogacao[par][horario]['mg' + str(i + 1)]['verde'] + catalogacao[par][horario]['mg' + str(i + 1)]['vermelha'] + catalogacao[par][horario]['mg' + str(i + 1)]['doji'])))
+								catalogacao[par][horario]['mg' + str(i + 1)]['%'] = round(100 * (catalogacao[par][horario]['mg' + str(i + 1)]['verde' if catalogacao[par][horario]['dir'] == 'CALL' else 'vermelha'] / (catalogacao[par][horario]['mg' + str(i + 1)]['verde'] + catalogacao[par][horario]['mg' + str(i + 1)]['vermelha'] + catalogacao[par][horario]['mg' + str(i + 1)]['doji'])))
 
-									soma['verde'] += catalogacao[par][mg_time]['verde']
-									soma['vermelha'] += catalogacao[par][mg_time]['vermelha']
-									soma['doji'] += catalogacao[par][mg_time]['doji']
-								else:
-									catalogacao[par][horario]['mg' + str(i + 1)]['%'] = 0
+								soma['verde'] += catalogacao[par][mg_time]['verde']
+								soma['vermelha'] += catalogacao[par][mg_time]['vermelha']
+								soma['doji'] += catalogacao[par][mg_time]['doji']
+							else:
+								catalogacao[par][horario]['mg' + str(i + 1)]['%'] = 0
 
-				print('finalizado em ' + str(int(time()) - timer) + ' segundos')
+			print('finalizado em ' + str(int(time()) - timer) + ' segundos')
+			contador += 1
 
 		print('\n\n')
 
@@ -168,6 +192,6 @@ try:
 								msg += ' | MG ' + str(i + 1) + ' - N/A - N/A'
 
 					print(msg)
-					open(arquivo, 'a').write('M' + str(timeframe) + ';' + par + ';' + horario + ';' + catalogacao[par][horario]['dir'].strip() + '\n')
+					open(arquivo_saida, 'a').write('M' + str(timeframe) + ';' + par + ';' + horario + ';' + catalogacao[par][horario]['dir'].strip() + '\n')
 except KeyboardInterrupt:
 	sys.exit()
