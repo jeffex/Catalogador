@@ -3,13 +3,23 @@ email = seu email
 senha = sua senha
 
 [CONFIGURACOES]
+
 timeframe = 5,15
 # Se mais de um timeframe separar por virgula. ex: 1,5,15
+
 dias = 15
+
 porcentagem = 85
+
 martingale = 0
+
 todos_pares = N
 # Caso S ira catalogar todos os pares disponiveis, inclusive OTC. Caso N ira catalogar so os pares abertos no momento
+
 arquivo_saida = lista.csv
+
 check_lista = S
 # Caso S irá gerar um outro arquivo com o formato de lista aceito pelo bot @checkalistabot no telegram, para checagem do resultado da lista
+
+validar_sinais = N
+# Caso S ira gerar os sinais no arquivo só se naquele horário a paridade estiver aberta, caso contrario ignora o sinal.

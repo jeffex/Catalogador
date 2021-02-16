@@ -2,7 +2,7 @@ from iqoptionapi.stable_api import IQ_Option
 from datetime import datetime, timedelta
 from colorama import init, Fore, Back
 from time import time
-import sys, os, configparser
+import sys, os, configparser, requests, json, re
 import numpy as np
 
 init(autoreset=True)
@@ -17,7 +17,6 @@ def Conexao():
 	API.connect()
 
 	if API.check_connect():
-		Clear_Screen()
 		print('Conectado com sucesso!')
 	else:
 		print('Erro ao conectar')
@@ -41,6 +40,7 @@ def Configuracoes():
 	config['todos_pares'] = arquivo.get('CONFIGURACOES', 'todos_pares')
 	config['arquivo_saida'] = arquivo.get('CONFIGURACOES', 'arquivo_saida')
 	config['check_lista'] = arquivo.get('CONFIGURACOES', 'check_lista')
+	config['validar_sinal'] = arquivo.get('CONFIGURACOES', 'validar_sinais')
 
 
 def Clear_Screen():
@@ -109,6 +109,84 @@ def Obter_Paridades():
 	return np.unique(paridades)
 
 
+def Obter_Horario_Paridades():
+	info_binarias = {}
+	info_digitais = {}
+	url = 'https://fininfo.iqoption.com/api/graphql'
+	arquivo_payload = open('payload_post.txt', 'r')
+	requisicao = requests.post(url, data=arquivo_payload)
+	dados = json.loads(requisicao.text)
+	for data in dados['data']['BinaryOption']:
+		if data['type'] == 'Forex' and len(data['schedule']) != 0:
+			x = []
+			y = {}
+			paridade = data['name']
+			y['data'] = data['schedule'][0]['from'].split('T')[0]
+			y['abertura'] = data['schedule'][0]['from'].split('T')[1].split('-')[0]
+			y['fechamento'] = data['schedule'][0]['to'].split('T')[1].split('-')[0]
+			x = [y]
+			paridade = String_Format(paridade)
+			info_binarias[paridade] = x
+
+	for data in dados['data']['DigitalOption']:
+		if data['type'] == 'Forex' and len(data['schedule']) != 0:
+			x = []
+			y = {}
+			paridade = data['name']
+			y['data'] = data['schedule'][0]['from'].split('T')[0]
+			y['abertura'] = data['schedule'][0]['from'].split('T')[1].split('-')[0]
+			y['fechamento'] = data['schedule'][0]['to'].split('T')[1].split('-')[0]
+			x = [y]
+			paridade = String_Format(paridade)
+			info_digitais[paridade] = x
+
+	return info_binarias, info_digitais
+
+
+def String_Format(string_par):
+	format_string = string_par.replace('/', '')
+	if re.match("[A-Z]{6} .{5}", format_string):
+		format_string = format_string.split(' ')
+		format_string = format_string[0] + '-OTC'
+
+	return format_string
+
+
+def Valida_Sinal(info_binarias, info_digitais, horario, paridade, data_atual):
+	if paridade in info_binarias:
+		if data_atual == info_binarias[paridade][0]['data']:
+			abertura = info_binarias[paridade][0]['abertura']
+			fechamento = info_binarias[paridade][0]['fechamento']
+			# dif_abertura: Retorna um numero positivo caso o horario do sinal seja maior que o horario de abertura da paridade. Ex: Horario do sinal 01:15 e abertura da paridade é de 01:00, irá retornar 15, que é a diferença em minutos.
+			dif_abertura = int((datetime.strptime(horario, '%H:%M') - datetime.strptime(abertura, '%H:%M:%S')).total_seconds() / 60)
+			# dif_fechamento: O inverso de dif_abertura. retorna um numero negativo (que é a diferença em minutos) se o horario do sinal for menor que o horario de fechamento da paridade.
+			dif_fechamento = int((datetime.strptime(horario, '%H:%M') - datetime.strptime(fechamento, '%H:%M:%S')).total_seconds() / 60)
+			# Verifica se o sinal esta dentro do horario de funcionamento da paridade, e retorna True caso esteja.
+			if dif_abertura > 0 and dif_fechamento < 0:
+				return True
+
+	if paridade in info_digitais:
+		if data_atual == info_digitais[paridade][0]['data']:
+			abertura = info_digitais[paridade][0]['abertura']
+			fechamento = info_digitais[paridade][0]['fechamento']
+			# dif_abertura: Retorna um numero positivo caso o horario do sinal seja maior que o horario de abertura da paridade. Ex: Horario do sinal 01:15 e abertura da paridade é de 01:00, irá retornar 15, que é a diferença em minutos.
+			dif_abertura = int((datetime.strptime(horario, '%H:%M') - datetime.strptime(abertura, '%H:%M:%S')).total_seconds() / 60)
+			# dif_fechamento: O inverso de dif_abertura. retorna um numero negativo (que é a diferença em minutos) se o horario do sinal for menor que o horario de fechamento da paridade.
+			dif_fechamento = int((datetime.strptime(horario, '%H:%M') - datetime.strptime(fechamento, '%H:%M:%S')).total_seconds() / 60)
+			# Verifica se o sinal esta dentro do horario de funcionamento da paridade, e retorna True caso esteja.
+			if dif_abertura > 0 and dif_fechamento < 0:
+				return True
+	# Retorna False caso não satisfaça nenhuma condição
+	return False
+
+
+def Escreve_Arquivo(arquivo_saida, timeframe, par, horario, direcao, data_atual, martingale):
+	open(arquivo_saida, 'a').write('M' + str(timeframe) + ';' + par + ';' + horario + ';' + direcao + '\n')
+	if check_lista == 'S':
+		open(str(arquivo_saida) + '-CHECK', 'a').write(f'{data_atual} {str(horario) + ":00"} {par} {direcao} {str(martingale) + "GL"} {str(timeframe) + "TM"}\n')
+
+
+Clear_Screen()
 print('=========================================\n|         CATALOGADOR DE SINAIS         |\n=========================================')
 
 
@@ -125,7 +203,8 @@ try:
 	prct_call = abs(porcentagem)
 	prct_put = abs(100 - porcentagem)
 	paridades = Obter_Paridades()
-	data = datetime.now().strftime('%Y-%m-%d')
+	data_atual = datetime.now().strftime('%Y-%m-%d')
+	info_binarias, info_digitais = Obter_Horario_Paridades()
 	print(f'{Fore.GREEN}>>>>>CATALOGANDO {len(paridades)} PARIDADES EM {len(timeframe_config)} TIMEFRAME(S)<<<<<')
 	for timeframe in timeframe_config:
 		catalogacao = {}
@@ -188,11 +267,13 @@ try:
 								msg += ' | MG ' + str(i + 1) + ' - ' + str(catalogacao[par][horario]['mg' + str(i + 1)]['%']) + '% - ' + Back.GREEN + Fore.BLACK + str(catalogacao[par][horario]['mg' + str(i + 1)]['verde']) + Back.RED + Fore.BLACK + str(catalogacao[par][horario]['mg' + str(i + 1)]['vermelha']) + Back.RESET + Fore.RESET + str(catalogacao[par][horario]['mg' + str(i + 1)]['doji'])
 							else:
 								msg += ' | MG ' + str(i + 1) + ' - N/A - N/A'
-
 					print(msg)
 					direcao = catalogacao[par][horario]['dir'].strip()
-					open(arquivo_saida, 'a').write('M' + str(timeframe) + ';' + par + ';' + horario + ';' + direcao + '\n')
-					if check_lista == 'S':
-						open(str(arquivo_saida) + '-CHECK', 'a').write(f'{data} {str(horario) + ":00"} {par} {direcao} {str(martingale) + "GL"} {str(timeframe) + "TM"}\n')
+					if config['validar_sinal'] == 'S':
+						if Valida_Sinal(info_binarias, info_digitais, horario, par, data_atual):
+							Escreve_Arquivo(arquivo_saida, timeframe, par, horario, direcao, data_atual, martingale)
+					else:
+						Escreve_Arquivo(arquivo_saida, timeframe, par, horario, direcao, data_atual, martingale)
+
 except KeyboardInterrupt:
 	sys.exit()
