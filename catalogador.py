@@ -51,7 +51,7 @@ def Clear_Screen():
 		os.system('clear')
 
 
-def cataloga(par, dias, prct_call, prct_put, timeframe):
+def cataloga(par, dias, prct_call, prct_put, timeframe, data_atual):
 	data = []
 	datas_testadas = []
 	time_ = time()
@@ -60,15 +60,16 @@ def cataloga(par, dias, prct_call, prct_put, timeframe):
 		velas = API.get_candles(par, (timeframe * 60), 1000, time_)
 		velas.reverse()
 		for x in velas:
-			if datetime.fromtimestamp(x['from']).strftime('%Y-%m-%d') not in datas_testadas:
-				datas_testadas.append(datetime.fromtimestamp(x['from']).strftime('%Y-%m-%d'))
+			if datetime.fromtimestamp(x['from']).strftime('%Y-%m-%d') != data_atual:
+				if datetime.fromtimestamp(x['from']).strftime('%Y-%m-%d') not in datas_testadas:
+					datas_testadas.append(datetime.fromtimestamp(x['from']).strftime('%Y-%m-%d'))
 
-			if len(datas_testadas) <= dias:
-				x.update({'cor': 'verde' if x['open'] < x['close'] else 'vermelha' if x['open'] > x['close'] else 'doji'})
-				data.append(x)
-			else:
-				sair = True
-				break
+				if len(datas_testadas) < dias:
+					x.update({'cor': 'verde' if x['open'] < x['close'] else 'vermelha' if x['open'] > x['close'] else 'doji'})
+					data.append(x)
+				else:
+					sair = True
+					break
 
 		time_ = int(velas[-1]['from'] - 1)
 
@@ -212,7 +213,7 @@ try:
 		for par in paridades:
 			timer = int(time())
 			print(f'{contador} - {Fore.GREEN}CATALOGANDO - {Fore.RESET} {Fore.BLUE}{par}{Fore.RESET} | TIMEFRAME {Fore.GREEN}M{timeframe}{Fore.RESET}...', end='')
-			catalogacao.update({par: cataloga(par, dias, prct_call, prct_put, timeframe)})
+			catalogacao.update({par: cataloga(par, dias, prct_call, prct_put, timeframe, data_atual)})
 
 			for par in catalogacao:
 				for horario in sorted(catalogacao[par]):
