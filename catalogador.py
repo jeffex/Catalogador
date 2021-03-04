@@ -64,7 +64,7 @@ def cataloga(par, dias, prct_call, prct_put, timeframe, data_atual):
 				if datetime.fromtimestamp(x['from']).strftime('%Y-%m-%d') not in datas_testadas:
 					datas_testadas.append(datetime.fromtimestamp(x['from']).strftime('%Y-%m-%d'))
 
-				if len(datas_testadas) < dias:
+				if len(datas_testadas) <= dias:
 					x.update({'cor': 'verde' if x['open'] < x['close'] else 'vermelha' if x['open'] > x['close'] else 'doji'})
 					data.append(x)
 				else:
