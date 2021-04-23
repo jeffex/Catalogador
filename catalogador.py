@@ -4,6 +4,7 @@ from colorama import init, Fore, Back
 from time import time
 import sys, os, configparser, requests, json, re
 import numpy as np
+import pandas as pd
 
 init(autoreset=True)
 
@@ -41,6 +42,8 @@ def Configuracoes():
 	config['arquivo_saida'] = arquivo.get('CONFIGURACOES', 'arquivo_saida')
 	config['check_lista'] = arquivo.get('CONFIGURACOES', 'check_lista')
 	config['validar_sinal'] = arquivo.get('CONFIGURACOES', 'validar_sinais')
+	config['tendencia'] = arquivo.get('CONFIGURACOES', 'tendencia')
+	config['tendencia_porcentagem'] = int(arquivo.get('CONFIGURACOES', 'tendencia_porcentagem'))
 
 
 def Clear_Screen():
@@ -59,25 +62,41 @@ def cataloga(par, dias, prct_call, prct_put, timeframe, data_atual):
 	while sair == False:
 		velas = API.get_candles(par, (timeframe * 60), 1000, time_)
 		velas.reverse()
+		posicao = 0
 		for x in velas:
+
 			if datetime.fromtimestamp(x['from']).strftime('%Y-%m-%d') != data_atual:
 				if datetime.fromtimestamp(x['from']).strftime('%Y-%m-%d') not in datas_testadas:
 					datas_testadas.append(datetime.fromtimestamp(x['from']).strftime('%Y-%m-%d'))
 
 				if len(datas_testadas) <= dias:
 					x.update({'cor': 'verde' if x['open'] < x['close'] else 'vermelha' if x['open'] > x['close'] else 'doji'})
-					data.append(x)
+					if config['tendencia'] == 'S':
+						velas_tendencia = velas[posicao:posicao + periodo_ema]
+						tendencia = Verificar_Tendencia(velas_tendencia)
+						x.update({'tendencia': tendencia})
+						data.append(x)
+					else:
+						data.append(x)
 				else:
 					sair = True
 					break
+			posicao += 1
 
 		time_ = int(velas[-1]['from'] - 1)
 
 	analise = {}
 	for velas in data:
 		horario = datetime.fromtimestamp(velas['from']).strftime('%H:%M')
-		if horario not in analise: analise.update({horario: {'verde': 0, 'vermelha': 0, 'doji': 0, '%': 0, 'dir': ''}})
+		if horario not in analise:
+			analise.update({horario: {'verde': 0, 'vermelha': 0, 'doji': 0, '%': 0, 'dir': '', 'tendencia': 0, 'contra_verde': 0, 'contra_vermelha': 0}})
 		analise[horario][velas['cor']] += 1
+		if config['tendencia'] == 'S':
+			if velas['cor'] != velas['tendencia']:
+				if velas['cor'] == 'verde':
+					analise[horario]['contra_verde'] += 1
+				else:
+					analise[horario]['contra_vermelha'] += 1
 
 		try:
 			analise[horario]['%'] = round(100 * (analise[horario]['verde'] / (analise[horario]['verde'] + analise[horario]['vermelha'] + analise[horario]['doji'])))
@@ -87,8 +106,30 @@ def cataloga(par, dias, prct_call, prct_put, timeframe, data_atual):
 	for horario in analise:
 		if analise[horario]['%'] > 50: analise[horario]['dir'] = 'CALL'
 		if analise[horario]['%'] < 50: analise[horario]['%'], analise[horario]['dir'] = 100 - analise[horario]['%'], 'PUT '
+		if config['tendencia'] == 'S':
+			if analise[horario]['dir'] == 'CALL':
+				analise[horario]['tendencia'] = int(100 - ((analise[horario]['contra_verde'] / analise[horario]['verde']) * 100))
+			else:
+				analise[horario]['tendencia'] = int(100 - ((analise[horario]['contra_vermelha'] / analise[horario]['vermelha']) * 100))
 
 	return analise
+
+
+def Verificar_Tendencia(velas_tendencia):
+	fechamento = round(velas_tendencia[0]['close'], 4)
+	df = pd.DataFrame(velas_tendencia)
+	EMA = df['close'].ewm(span=periodo_ema, adjust=False).mean()
+	for data in EMA:
+		EMA_line = data
+
+	if EMA_line > fechamento:
+		dir = 'vermelha'
+	elif fechamento > EMA_line:
+		dir = 'verde'
+	else:
+		dir = False
+
+	return dir
 
 
 def Obter_Paridades():
@@ -203,6 +244,7 @@ try:
 	martingale = config['martingale']
 	prct_call = abs(porcentagem)
 	prct_put = abs(100 - porcentagem)
+	periodo_ema = 20
 	paridades = Obter_Paridades()
 	data_atual = datetime.now().strftime('%Y-%m-%d')
 	info_binarias, info_digitais = Obter_Horario_Paridades()
@@ -249,14 +291,18 @@ try:
 		for par in catalogacao:
 			for horario in sorted(catalogacao[par]):
 				ok = False
+				if config['tendencia'] == 'S':
+					if catalogacao[par][horario]['tendencia'] >= config['tendencia_porcentagem'] and catalogacao[par][horario]['%'] >= porcentagem:
+						ok = True
 
-				if catalogacao[par][horario]['%'] >= porcentagem:
-					ok = True
 				else:
-					for i in range(int(martingale)):
-						if catalogacao[par][horario]['mg' + str(i + 1)]['%'] >= porcentagem:
-							ok = True
-							break
+					if catalogacao[par][horario]['%'] >= porcentagem:
+						ok = True
+					else:
+						for i in range(int(martingale)):
+							if catalogacao[par][horario]['mg' + str(i + 1)]['%'] >= porcentagem:
+								ok = True
+								break
 
 				if ok == True:
 

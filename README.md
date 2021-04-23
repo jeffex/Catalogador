@@ -6,6 +6,7 @@ Gerador de lista de sinais para IQOption
 - Gera lista para todos os pares ou só para os abertos no momento
 - Pode gerar uma segunda lista de sinais no formato aceito pelo bot do telegram [@checkalistabot](http://t.me/checkalistabot "@checkalistabot") para realizar checagem da lista
 - Martingale
+- Filtro de tendencia
 
 ### Formato de saida
 **lista de sinais:** TEMPO;PARIDADE;HORA;DIRECAO
@@ -22,6 +23,7 @@ Gerador de lista de sinais para IQOption
 - datetime
 - colorama
 - numpy
+- pandas
 
 ## Configuração
 1. Instale os módulos necessários usando o pip

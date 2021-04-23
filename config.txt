@@ -23,3 +23,7 @@ check_lista = S
 
 validar_sinais = N
 # Caso S ira gerar os sinais no arquivo só se naquele horário a paridade estiver aberta, caso contrario ignora o sinal.
+
+tendencia = S
+# Se ativado (S), irá so gerar sinais em que a taxa de assertividade a favor da tendencia seja igual ou superior a porcentagem estabelecida abaixo
+tendencia_porcentagem = 70

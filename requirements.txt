@@ -3,4 +3,4 @@ datetime
 colorama
 numpy
 requests
-json
+pandas
